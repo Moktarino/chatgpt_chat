@@ -6,6 +6,7 @@ import os
 import speech_recognition as sr
 import whisper
 import torch
+import pyttsx3
 
 from datetime import datetime, timedelta
 from queue import Queue
@@ -13,8 +14,26 @@ from tempfile import NamedTemporaryFile
 from time import sleep
 from sys import platform
 
+import openai
+openai.api_key = os.getenv("OPENAI_API_KEY")
+if not os.getenv("OPENAI_API_KEY"):
+    print("Missing environment variable: OPENAI_API_KEY")
+    exit(1)
+    
+engine = pyttsx3.init()
+
+def getchat(phrase):
+  completion = openai.ChatCompletion.create(
+    model="gpt-3.5-turbo",
+    messages=[
+      {"role": "user", "content": phrase}
+    ]
+  )
+  return completion.choices[0].message.content
+
 
 def main():
+    mychat = ""
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="medium", help="Model to use",
                         choices=["tiny", "base", "small", "medium", "large"])
@@ -92,7 +111,7 @@ def main():
 
     # Cue the user that we're ready to go.
     print("Model loaded.\n")
-
+    
     while True:
         try:
             now = datetime.utcnow()
@@ -128,6 +147,8 @@ def main():
                 # Otherwise edit the existing one.
                 if phrase_complete:
                     transcription.append(text)
+                    mychat = getchat(text)
+                    transcription.append(mychat)
                 else:
                     transcription[-1] = text
 
@@ -135,9 +156,12 @@ def main():
                 os.system('cls' if os.name=='nt' else 'clear')
                 for line in transcription:
                     print(line)
+
                 # Flush stdout.
                 print('', end='', flush=True)
-
+                if mychat:
+                    engine.say(mychat)
+                    engine.runAndWait()
                 # Infinite loops are bad for processors, must sleep.
                 sleep(0.25)
         except KeyboardInterrupt:
@@ -146,6 +170,7 @@ def main():
     print("\n\nTranscription:")
     for line in transcription:
         print(line)
+
 
 
 if __name__ == "__main__":
